@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BUG HUNTER AI — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;700;900&display=swap');
+
+    :root {
+      --neon-cyan: #06b6d4;
+      --neon-emerald: #10b981;
+      --neon-rose: #f43f5e;
+      --neon-amber: #f59e0b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(6, 182, 212, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(244, 63, 94, 0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+        #020617;
+      min-height: 100vh;
+    }
+
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    .neon-text { text-shadow: 0 0 20px rgba(6, 182, 212, 0.5), 0 0 40px rgba(6, 182, 212, 0.2); }
+    .neon-glow-cyan { box-shadow: 0 0 20px rgba(6, 182, 212, 0.3), 0 0 60px rgba(6, 182, 212, 0.1); }
+    .neon-glow-rose { box-shadow: 0 0 15px rgba(244, 63, 94, 0.3), 0 0 40px rgba(244, 63, 94, 0.1); }
+    .neon-glow-emerald { box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+
+    .card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(2, 6, 23, 0.95) 100%);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(51, 65, 85, 0.4);
+    }
+
+    .btn-run {
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      transition: all 0.3s ease;
+      box-shadow: 0 0 20px rgba(6, 182, 212, 0.4), 0 4px 15px rgba(59, 130, 246, 0.3);
+    }
+    .btn-run:hover {
+      background: linear-gradient(135deg, #22d3ee, #60a5fa);
+      box-shadow: 0 0 30px rgba(6, 182, 212, 0.6), 0 6px 25px rgba(59, 130, 246, 0.5);
+      transform: translateY(-2px);
+    }
+    .btn-run:disabled {
+      background: linear-gradient(135deg, #374151, #1f2937);
+      box-shadow: none;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-stop {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.3);
+      transition: all 0.3s ease;
+    }
+    .btn-stop:hover {
+      box-shadow: 0 0 25px rgba(239, 68, 68, 0.5);
+    }
+
+    .log-line { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+
+    #logStream { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+    #logStream::-webkit-scrollbar { width: 6px; }
+    #logStream::-webkit-scrollbar-track { background: transparent; }
+    #logStream::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    .metric-card {
+      background: linear-gradient(135deg, rgba(15, 23, 42, 0.6), rgba(2, 6, 23, 0.8));
+      border: 1px solid rgba(51, 65, 85, 0.3);
+      transition: all 0.3s ease;
+    }
+    .metric-card:hover { border-color: rgba(6, 182, 212, 0.3); transform: translateY(-2px); }
+
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    @keyframes pulseNeon { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .pulse-neon { animation: pulseNeon 2s ease-in-out infinite; }
+
+    .failure-item { border-left: 3px solid #f43f5e; background: rgba(244, 63, 94, 0.05); }
+  </style>
+</head>
+<body class="text-slate-200 min-h-screen">
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="border-b border-slate-800/60 bg-slate-950/50 backdrop-blur-xl sticky top-0 z-50">
+    <div class="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="text-3xl">🐛</div>
+        <div>
+          <h1 class="text-2xl font-black tracking-tight neon-text text-cyan-400">BUG HUNTER AI</h1>
+          <p class="text-xs text-slate-500 tracking-widest uppercase">Playwright Automation Dashboard</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="serverStatus" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/50">
+          <div id="statusDot" class="status-dot bg-emerald-400 animate-pulse"></div>
+          <span id="statusText" class="text-xs font-medium text-emerald-400">Server Online</span>
+        </div>
+        <div class="text-xs text-slate-600 font-mono" id="clock"></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <main class="max-w-[1600px] mx-auto p-6 grid grid-cols-12 gap-6">
+
+    <!-- ========== LEFT COLUMN: Command & Logs ========== -->
+    <div class="col-span-12 lg:col-span-5 flex flex-col gap-6">
+
+      <!-- Command Center -->
+      <div class="card rounded-2xl p-6 neon-glow-cyan">
+        <div class="flex items-center gap-2 mb-5">
+          <span class="text-lg">⚡</span>
+          <h2 class="text-lg font-bold text-white">Command Center</h2>
+        </div>
+
+        <label class="text-xs text-slate-400 uppercase tracking-wider mb-2 block">Test Suite</label>
+        <select id="suiteSelect" class="w-full bg-slate-900 border border-slate-700 text-slate-200 rounded-xl px-4 py-3 text-sm mb-4 focus:border-cyan-500 focus:outline-none transition">
+          <option value="test">Full Suite (Chromium)</option>
+          <option value="test:smoke">Smoke Tests (Critical Flows)</option>
+          <option value="test:a11y">Accessibility Tests</option>
+          <option value="test:visual">Visual Regression Tests</option>
+          <option value="test:api">API Monitoring Tests</option>
+          <option value="test:critical">Critical Tests (@critical)</option>
+          <option value="test:chrome">Chrome Browser</option>
+          <option value="test:firefox">Firefox Browser</option>
+          <option value="test:webkit">WebKit Browser</option>
+          <option value="test:all-browsers">All Browsers</option>
+          <option value="test:devices">Device Emulation</option>
+          <option value="test:regression">Regression Suite</option>
+        </select>
+
+        <div class="flex gap-3">
+          <button id="runBtn" onclick="runTest()" class="btn-run flex-1 text-white font-bold py-3 px-6 rounded-xl text-sm uppercase tracking-wider">
+            🚀 Initiate AI-Test
+          </button>
+          <button id="stopBtn" onclick="stopTest()" class="btn-stop text-white font-bold py-3 px-4 rounded-xl text-sm hidden" title="Stop Test">
+            ■
+          </button>
+        </div>
+      </div>
+
+      <!-- Logs Stream -->
+      <div class="card rounded-2xl p-6 flex-1 flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">📋</span>
+            <h2 class="text-lg font-bold text-white">Logs Stream</h2>
+          </div>
+          <button onclick="clearLogs()" class="text-xs text-slate-500 hover:text-slate-300 transition px-2 py-1 rounded border border-slate-800">Clear</button>
+        </div>
+        <div id="logStream" class="bg-slate-950 rounded-xl p-4 flex-1 overflow-y-auto font-mono text-xs leading-relaxed max-h-[500px] min-h-[300px]">
+          <div class="text-slate-600 italic">Waiting for test execution...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== RIGHT COLUMN: Analytics ========== -->
+    <div class="col-span-12 lg:col-span-7 flex flex-col gap-6">
+
+      <!-- Analysis Hub -->
+      <div class="card rounded-2xl p-6 neon-glow-cyan">
+        <div class="flex items-center gap-2 mb-5">
+          <span class="text-lg">📊</span>
+          <h2 class="text-lg font-bold text-white">Analysis Hub</h2>
+        </div>
+
+        <div class="grid grid-cols-12 gap-6">
+          <!-- Donut Chart -->
+          <div class="col-span-5 flex items-center justify-center">
+            <div class="relative w-48 h-48">
+              <canvas id="donutChart"></canvas>
+              <div class="absolute inset-0 flex items-center justify-center flex-col">
+                <span id="chartCenter" class="text-2xl font-black text-white">0</span>
+                <span class="text-[10px] text-slate-500 uppercase">Total</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Metrics Grid -->
+          <div class="col-span-7 grid grid-cols-2 gap-3">
+            <div class="metric-card rounded-xl p-4 text-center">
+              <div class="text-3xl font-black text-cyan-400" id="metricTotal">0</div>
+              <div class="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Total Tests</div>
+            </div>
+            <div class="metric-card rounded-xl p-4 text-center">
+              <div class="text-3xl font-black text-emerald-400" id="metricPassed">0</div>
+              <div class="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Passed</div>
+            </div>
+            <div class="metric-card rounded-xl p-4 text-center">
+              <div class="text-3xl font-black text-rose-400" id="metricFailed">0</div>
+              <div class="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Failed</div>
+            </div>
+            <div class="metric-card rounded-xl p-4 text-center">
+              <div class="text-3xl font-black text-amber-400" id="metricDuration">0s</div>
+              <div class="text-[10px] text-slate-500 uppercase tracking-wider mt-1">Duration</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Critical Anomaly Area -->
+      <div id="anomalySection" class="card rounded-2xl p-6 border-rose-500/30 hidden">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="text-lg">🔴</span>
+          <h2 class="text-lg font-bold text-rose-400">Critical Anomalies</h2>
+          <span id="failureCount" class="ml-auto bg-rose-500/20 text-rose-400 text-xs font-bold px-2 py-0.5 rounded-full"></span>
+        </div>
+        <div id="failureList" class="space-y-3 max-h-[400px] overflow-y-auto"></div>
+      </div>
+
+      <!-- Test History -->
+      <div class="card rounded-2xl p-6">
+        <div class="flex items-center gap-2 mb-4">
+          <span class="text-lg">📜</span>
+          <h2 class="text-lg font-bold text-white">Execution History</h2>
+        </div>
+        <div id="historyList" class="space-y-2 max-h-[250px] overflow-y-auto">
+          <div class="text-slate-600 text-sm italic">No test runs yet.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== FOOTER ==================== -->
+  <footer class="border-t border-slate-800/40 mt-8">
+    <div class="max-w-[1600px] mx-auto px-6 py-4 flex justify-between text-xs text-slate-600">
+      <span>Bug Hunter AI v2.0 — Playwright Automation Dashboard</span>
+      <span id="footerStatus">Ready</span>
+    </div>
+  </footer>
+
+  <!-- ==================== SCRIPTS ==================== -->
+  <script>
+    // ── Chart.js Setup ──
+    const ctx = document.getElementById('donutChart').getContext('2d');
+    const donutChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Passed', 'Failed', 'Skipped'],
+        datasets: [{
+          data: [0, 0, 0],
+          backgroundColor: ['#10b981', '#f43f5e', '#64748b'],
+          borderColor: ['#059669', '#e11d48', '#475569'],
+          borderWidth: 1,
+          hoverOffset: 8,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        cutout: '75%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            borderColor: '#334155',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#94a3b8',
+            padding: 10,
+          },
+        },
+        animation: { animateRotate: true, duration: 800 },
+      },
+    });
+
+    // ── Clock ──
+    function updateClock() {
+      document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ── Load suites from backend ──
+    async function loadSuites() {
+      try {
+        const res = await fetch('/api/suites');
+        const suites = await res.json();
+        const select = document.getElementById('suiteSelect');
+        select.innerHTML = '';
+        for (const [key, label] of Object.entries(suites)) {
+          const opt = document.createElement('option');
+          opt.value = key;
+          opt.textContent = label;
+          select.appendChild(opt);
+        }
+      } catch (e) {
+        addLog('Failed to load test suites from server.', 'error');
+      }
+    }
+
+    // ── Check server status ──
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        updateServerIndicator(true);
+        renderHistory(data.history || []);
+
+        // Also fetch latest results
+        const resR = await fetch('/api/results');
+        const results = await resR.json();
+        if (results.total !== undefined) {
+          updateMetrics(results);
+          updateChart(results);
+          if (results.failures && results.failures.length > 0) {
+            renderFailures(results.failures);
+          }
+        }
+      } catch {
+        updateServerIndicator(false);
+      }
+    }
+
+    function updateServerIndicator(online) {
+      const dot = document.getElementById('statusDot');
+      const text = document.getElementById('statusText');
+      if (online) {
+        dot.className = 'status-dot bg-emerald-400 animate-pulse';
+        text.textContent = 'Server Online';
+        text.className = 'text-xs font-medium text-emerald-400';
+      } else {
+        dot.className = 'status-dot bg-rose-500';
+        text.textContent = 'Server Offline';
+        text.className = 'text-xs font-medium text-rose-400';
+      }
+    }
+
+    // ── Run Test ──
+    let eventSource = null;
+    let isRunning = false;
+
+    async function runTest() {
+      if (isRunning) return;
+      const suite = document.getElementById('suiteSelect').value;
+      const runBtn = document.getElementById('runBtn');
+      const stopBtn = document.getElementById('stopBtn');
+
+      isRunning = true;
+      runBtn.disabled = true;
+      runBtn.innerHTML = '⚡ RUNNING PLAYWRIGHT...';
+      stopBtn.classList.remove('hidden');
+      document.getElementById('footerStatus').textContent = `Running: ${suite}`;
+      clearLogs();
+      addLog(`▶ Initiating test suite: ${suite}`, 'info');
+      addLog(`─`.repeat(50), 'dim');
+
+      try {
+        // Use fetch + SSE
+        const response = await fetch('/api/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ suite }),
+        });
+
+        if (!response.ok) {
+          let errMsg = `Server returned ${response.status}`;
+          try {
+            const ct = response.headers.get('content-type') || '';
+            if (ct.includes('application/json')) {
+              const err = await response.json();
+              errMsg = err.error || errMsg;
+            } else {
+              const text = await response.text();
+              if (text.length < 200) errMsg = text;
+            }
+          } catch {}
+          addLog(`✖ Error: ${errMsg}`, 'error');
+          resetRunState();
+          return;
+        }
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('text/event-stream')) {
+          addLog('✖ Server did not return an event stream. Is the server running?', 'error');
+          resetRunState();
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop(); // keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              currentEvent = line.replace('event: ', '').trim();
+            } else if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.replace('data: ', ''));
+                handleSSEEvent(currentEvent, data);
+              } catch {}
+            }
+          }
+        }
+      } catch (err) {
+        addLog(`✖ Connection error: ${err.message}`, 'error');
+      }
+
+      resetRunState();
+    }
+
+    let currentEvent = '';
+
+    function handleSSEEvent(event, data) {
+      switch (event) {
+        case 'started':
+          addLog(`✔ Test started: ${data.label}`, 'success');
+          addLog(`  Timestamp: ${data.startTime}`, 'dim');
+          addLog('', 'dim');
+          break;
+
+        case 'log':
+          const level = classifyLog(data.line);
+          addLog(data.line, level);
+          break;
+
+        case 'finished':
+          addLog('', 'dim');
+          addLog(`─`.repeat(50), 'dim');
+          if (data.exitCode === 0) {
+            addLog(`✔ Tests completed successfully in ${data.duration}s`, 'success');
+          } else {
+            addLog(`✖ Tests finished with exit code ${data.exitCode} (${data.duration}s)`, 'error');
+          }
+          break;
+
+        case 'results':
+          updateMetrics(data);
+          updateChart(data);
+          if (data.failures && data.failures.length > 0) {
+            renderFailures(data.failures);
+          } else {
+            hideFailures();
+          }
+          break;
+
+        case 'error':
+          addLog(`✖ Process error: ${data.message}`, 'error');
+          break;
+      }
+    }
+
+    function classifyLog(line) {
+      const lower = line.toLowerCase();
+      if (lower.includes('passed') || lower.includes('✓') || lower.includes('pass')) return 'success';
+      if (lower.includes('failed') || lower.includes('✘') || lower.includes('error') || lower.includes('fail')) return 'error';
+      if (lower.includes('warn') || lower.includes('flaky') || lower.includes('skip') || lower.includes('slow')) return 'warning';
+      if (lower.includes('running') || lower.includes('▶')) return 'info';
+      return 'dim';
+    }
+
+    function resetRunState() {
+      isRunning = false;
+      const runBtn = document.getElementById('runBtn');
+      const stopBtn = document.getElementById('stopBtn');
+      runBtn.disabled = false;
+      runBtn.innerHTML = '🚀 Initiate AI-Test';
+      stopBtn.classList.add('hidden');
+      document.getElementById('footerStatus').textContent = 'Ready';
+      checkStatus(); // refresh
+    }
+
+    async function stopTest() {
+      try {
+        await fetch('/api/stop', { method: 'POST' });
+        addLog('■ Test process terminated by user.', 'warning');
+      } catch {}
+      resetRunState();
+    }
+
+    // ── Log Helpers ──
+    function addLog(text, level = 'dim') {
+      const stream = document.getElementById('logStream');
+      // Remove placeholder
+      const placeholder = stream.querySelector('.italic');
+      if (placeholder) placeholder.remove();
+
+      const div = document.createElement('div');
+      div.className = 'log-line mb-0.5';
+
+      const colors = {
+        success: 'text-emerald-400',
+        error: 'text-rose-400',
+        warning: 'text-amber-400',
+        info: 'text-cyan-400',
+        dim: 'text-slate-500',
+      };
+
+      div.classList.add(colors[level] || 'text-slate-400');
+
+      const time = new Date().toLocaleTimeString();
+      if (text === '') {
+        div.innerHTML = '&nbsp;';
+      } else {
+        div.innerHTML = `<span class="text-slate-700">[${time}]</span> ${escapeHtml(text)}`;
+      }
+
+      stream.appendChild(div);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById('logStream').innerHTML = '';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ── Metrics & Chart ──
+    function updateMetrics(data) {
+      document.getElementById('metricTotal').textContent = data.total || 0;
+      document.getElementById('metricPassed').textContent = data.passed || 0;
+      document.getElementById('metricFailed').textContent = data.failed || 0;
+      document.getElementById('metricDuration').textContent = (data.duration || 0) + 's';
+      document.getElementById('chartCenter').textContent = data.total || 0;
+    }
+
+    function updateChart(data) {
+      const passed = data.passed || 0;
+      const failed = data.failed || 0;
+      const skipped = data.skipped || 0;
+      donutChart.data.datasets[0].data = [passed, failed, skipped];
+      donutChart.update();
+    }
+
+    // ── Failures ──
+    function renderFailures(failures) {
+      const section = document.getElementById('anomalySection');
+      const list = document.getElementById('failureList');
+      const count = document.getElementById('failureCount');
+
+      section.classList.remove('hidden');
+      count.textContent = `${failures.length} failure${failures.length > 1 ? 's' : ''}`;
+      list.innerHTML = '';
+
+      failures.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'failure-item rounded-lg p-4';
+        div.innerHTML = `
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1">
+              <h4 class="text-sm font-bold text-rose-300 mb-1">${escapeHtml(f.title)}</h4>
+              ${f.file ? `<p class="text-[10px] text-slate-500 mb-2 font-mono">${escapeHtml(f.file)}</p>` : ''}
+              <pre class="text-xs text-slate-400 font-mono whitespace-pre-wrap bg-slate-950/50 rounded p-2 max-h-32 overflow-auto">${escapeHtml(f.error || 'Test failed')}</pre>
+            </div>
+            <div class="text-xs text-slate-600 whitespace-nowrap">${f.duration ? (f.duration / 1000).toFixed(1) + 's' : ''}</div>
+          </div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    function hideFailures() {
+      document.getElementById('anomalySection').classList.add('hidden');
+    }
+
+    // ── History ──
+    function renderHistory(history) {
+      const list = document.getElementById('historyList');
+      if (!history || history.length === 0) {
+        list.innerHTML = '<div class="text-slate-600 text-sm italic">No test runs yet.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      history.slice().reverse().forEach(h => {
+        const div = document.createElement('div');
+        const isSuccess = h.exitCode === 0;
+        div.className = `flex items-center justify-between p-3 rounded-lg border ${isSuccess ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-rose-500/20 bg-rose-500/5'}`;
+        div.innerHTML = `
+          <div class="flex items-center gap-3">
+            <span>${isSuccess ? '✅' : '❌'}</span>
+            <div>
+              <div class="text-sm font-medium text-slate-300">${escapeHtml(h.label)}</div>
+              <div class="text-[10px] text-slate-600">${new Date(h.timestamp).toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="text-xs text-slate-500 font-mono">${h.duration}s</div>
+        `;
+        list.appendChild(div);
+      });
+    }
+
+    // ── Init ──
+    loadSuites();
+    checkStatus();
+    setInterval(checkStatus, 15000); // poll every 15s
+  </script>
+</body>
+</html>
