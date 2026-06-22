@@ -101,3 +101,30 @@ export const test = base.extend({
 });
 
 export { expect } from '@playwright/test';
+
+/**
+ * Helper to switch the website language via the language dropdown.
+ * @param page - Playwright page object
+ * @param lang - 'en' or 'id'
+ */
+export async function switchLanguage(page: import('@playwright/test').Page, lang: 'en' | 'id') {
+  // Click the language switcher (last #composition-button in navbar)
+  const langSwitcher = page.locator('#composition-button').last();
+  await langSwitcher.click();
+  await page.waitForTimeout(500);
+
+  if (lang === 'en') {
+    const enOption = page.getByText(/English \(EN\)/i);
+    if (await enOption.isVisible()) {
+      await enOption.click();
+    }
+  } else {
+    const idOption = page.getByText(/Indonesia \(ID\)/i);
+    if (await idOption.isVisible()) {
+      await idOption.click();
+    }
+  }
+
+  await page.waitForTimeout(1500);
+  await page.waitForLoadState('networkidle');
+}
