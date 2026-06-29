@@ -111,20 +111,17 @@ export async function switchLanguage(page: import('@playwright/test').Page, lang
   // Click the language switcher (last #composition-button in navbar)
   const langSwitcher = page.locator('#composition-button').last();
   await langSwitcher.click();
-  await page.waitForTimeout(500);
 
   if (lang === 'en') {
-    const enOption = page.getByText(/English \(EN\)/i);
-    if (await enOption.isVisible()) {
-      await enOption.click();
-    }
+    await page.getByText(/English \(EN\)/i).click();
   } else {
-    const idOption = page.getByText(/Indonesia \(ID\)/i);
-    if (await idOption.isVisible()) {
-      await idOption.click();
-    }
+    await page.getByText(/Indonesia \(ID\)/i).click();
   }
 
-  await page.waitForTimeout(1500);
-  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(1000);
+  try {
+    await page.waitForLoadState('networkidle', { timeout: 3000 });
+  } catch (e) {
+    // Ignore networkidle timeout to prevent hanging on background requests
+  }
 }

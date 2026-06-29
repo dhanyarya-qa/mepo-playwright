@@ -16,21 +16,47 @@ Automated end-to-end testing for [dev.mepo.travel](https://dev.mepo.travel/) usi
 | Contact Form | 35 | Positive cases (9) + Negative cases (16) + Text validation (10) — **Form submission tests skipped** |
 | Language Switch | 7 | ID/EN switcher, dropdown options |
 | Responsive | 14 | Mobile, Tablet, Desktop, Wide Desktop |
-| **Translation EN** | 31 | Navbar, hero, about, value props, features, partnership, footer — **English only** |
-| **Translation ID** | 29 | Navbar, hero, about, value props, features, partnership, footer — **Indonesian only** |
+| **Translation EN** | 64 | Navbar, hero, about, value props, features, partnership, footer — **English only** |
+| **Translation ID** | 62 | Navbar, hero, about, value props, features, partnership, footer — **Indonesian only** |
 | **Smoke Tests** | 6 | Critical flow sanity checks |
 | **Visual Regression** | 7 | Full-page + component screenshot comparison |
 | **API Monitoring** | 12 | Server errors, console errors, broken images, load time (updated thresholds) |
 | **Accessibility** | 9 | WCAG 2.0 scan, alt text, headings, keyboard nav, contrast |
 | **Data-Driven Form** | 10 | JSON-based test data (10 scenarios) — **All skipped to prevent spam** |
 | **Device Emulation** | 5×4 | iPhone 14, Galaxy S5, iPad Pro 11, Pixel 7 |
-| **Total** | **~380+** | **All passed, 11 skipped** |
+| **Total** | **~446+** | **All passed, 11 skipped** |
 
 > ✅ **Latest run:** All passed, 0 failed, 11 skipped
 
 ---
 
-## 🆕 What's New (v2.5 — June 2026)
+## 🆕 What's New (v2.6 — June 2026)
+
+### 🧪 Expanded Translation Coverage + Switcher Stability
+
+The EN/ID translation suites were **roughly doubled** for deeper per-page text validation, and the language switcher logic was hardened against flakiness.
+
+| Suite | Before | After |
+|---|---|---|
+| `translate-en.spec.ts` | 31 | **64** |
+| `translate-id.spec.ts` | 29 | **62** |
+
+```bash
+npm run test:en        # Test English only (64 tests)
+npm run test:id        # Test Indonesian only (62 tests)
+npm run test:translate # Test both languages (126 tests)
+```
+
+### 🔧 Language Switcher Reliability
+
+| File | Change |
+|---|---|
+| `fixtures.ts` (`switchLanguage`) | Removed fixed pre-click `waitForTimeout`, click the EN/ID option directly, and wrap `waitForLoadState('networkidle')` in a 3s try/catch so background requests no longer hang the helper |
+| `language-switch.spec.ts` | Replaced silent `if (isVisible)` guards with explicit `expect(option).toBeVisible()` assertions — the test now **fails loudly** if the switcher breaks instead of silently passing |
+
+---
+
+## 🆕 Previous Update (v2.5 — June 2026)
 
 ### 🧪 Separate EN/ID Translation Tests
 
@@ -298,8 +324,8 @@ mepo-playwright/
 │   ├── contact-form.spec.ts        # Form positive & negative cases (35 tests)
 │   ├── contact-form-data-driven.spec.ts  # Data-driven form tests (10 scenarios)
 │   ├── language-switch.spec.ts     # Language switcher EN/ID (7 tests)
-│   ├── translate-en.spec.ts        # 🆕 English translation validation (31 tests)
-│   ├── translate-id.spec.ts        # 🆕 Indonesian translation validation (29 tests)
+│   ├── translate-en.spec.ts        # English translation validation (64 tests)
+│   ├── translate-id.spec.ts        # Indonesian translation validation (62 tests)
 │   ├── responsive.spec.ts          # Responsive design (14 tests)
 │   ├── smoke.spec.ts               # Smoke test suite (6 tests)
 │   ├── visual-regression.spec.ts   # Visual screenshot tests (7 tests)

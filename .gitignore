@@ -25,3 +25,13 @@ Thumbs.db
 
 # Temp/scratch files
 *.cjs
+
+# Generated documentation (kept local, not pushed)
+test_documentation.docx
+test_documentation.pdf
+*.docx
+*.pdf
+
+# Claude Code / local tooling
+.claude/
+RTK.md

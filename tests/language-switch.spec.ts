@@ -42,27 +42,23 @@ test.describe('Language Switch - dev.mepo.travel', () => {
   test('should be able to switch to English', async ({ page }) => {
     const langSwitcher = page.locator('#composition-button').last();
     await langSwitcher.click();
-    await page.waitForTimeout(500);
 
     const enOption = page.getByText(/English \(EN\)/i);
-    if (await enOption.isVisible()) {
-      await enOption.click();
-      await page.waitForTimeout(1000);
-      await page.waitForLoadState('networkidle');
-    }
+    await expect(enOption).toBeVisible();
+    await enOption.click();
+    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
   });
 
   test('should be able to switch to Indonesian', async ({ page }) => {
     const langSwitcher = page.locator('#composition-button').last();
     await langSwitcher.click();
-    await page.waitForTimeout(500);
 
     const idOption = page.getByText(/Indonesia \(ID\)/i);
-    if (await idOption.isVisible()) {
-      await idOption.click();
-      await page.waitForTimeout(1000);
-      await page.waitForLoadState('networkidle');
-    }
+    await expect(idOption).toBeVisible();
+    await idOption.click();
+    await page.waitForTimeout(1000);
+    await page.waitForLoadState('networkidle');
   });
 
   test('should display translation icon', async ({ page }) => {
